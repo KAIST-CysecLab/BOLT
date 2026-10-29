@@ -65,7 +65,7 @@ from there.
 - Network access to `ghcr.io` (vulnerability DB) and, for bin-sbom, `github.com` (Ghidra)
 - Disk space for:
   - the vulnerability DB: download cache, MySQL data, and backup tables left by updates
-    (see [Disk usage](#disk-usage))
+    (see [Automatic updates](#automatic-updates))
   - Ghidra (about 640MB) and, once built, the component database (size depends on the
     projects you collect)
 
@@ -124,8 +124,7 @@ component database**, so bin-sbom is not usable yet: to scan with it,
 
 > [!IMPORTANT]
 > This step is required before bin-sbom can be used. BOLT does not distribute a component
-> database, so every installation builds its own (or installs one its team built; see
-> [Sharing a built database](#sharing-a-built-database)).
+> database, so every installation builds its own.
 
 bin-sbom identifies OSS components by comparing the functions in a binary against a
 component database (CDB) built from the source code of the projects you want to detect.
@@ -228,18 +227,6 @@ without scanning.
 The CDB contains data derived from the source code of the projects you collected, such as
 function hashes, function names, file paths, strings and license metadata. Check the
 licenses of those projects before you share a CDB outside your team.
-
-### Sharing a built database
-
-To reuse a CDB on other machines without rebuilding it, package it and host the archive
-yourself:
-
-```bash
-./pack-bin-sbom-data.sh                                       # on the machine that built it
-BIN_SBOM_DATA_URL=<url> ./fetch-bin-sbom-data.sh              # on another machine
-```
-
-The archive is not checksum-verified, so host it somewhere you trust.
 
 ## Scanning
 
@@ -348,33 +335,28 @@ component's `properties`.
 
 ### Automatic updates
 
-BOLT reads vulnerability data from MySQL. The data is not maintained by hand: BOLT
-downloads the official vulnerability database that Aqua Security publishes for Trivy
-(**trivy-db**, `ghcr.io/aquasecurity/trivy-db:2`, rebuilt about every 6 hours) and converts
-it into MySQL tables.
+BOLT reads vulnerability data from MySQL, filled from the official database that Aqua
+Security publishes for Trivy (`ghcr.io/aquasecurity/trivy-db:2`, rebuilt about every 6
+hours).
 
-Every scan that uses MySQL (the default under `docker compose`) first does the following:
+Before each scan that uses MySQL (the default under `docker compose`), BOLT checks whether
+a newer database has been published. If not, the scan starts right away. If so, BOLT
+downloads it and replaces the MySQL contents before scanning. If the check or the update
+fails, the existing data is left as it was and the scan stops with an error, rather than
+running against an outdated database.
 
-```mermaid
-flowchart TD
-    A[Scan starts<br/>MySQL in use] --> B{"Look up the latest<br/>trivy-db digest on ghcr.io"}
-    B --> C{"Same digest as the DB<br/>already in MySQL?"}
-    C -- yes --> S[Scan without updating]
-    C -- no --> D["Download and verify the new trivy-db<br/>(.cache/db-updates/&lt;digest&gt;/)"]
-    D --> E["Load it into staging tables<br/>and verify row counts"]
-    E --> F["Swap the tables in one step<br/>(old tables kept as _backup_*)"]
-    F --> S
-    B -- fails --> X[Exit with an error<br/>existing DB unchanged]
-    E -- fails --> X
+Each update keeps the previous tables as `*_backup_*` and the downloaded database under
+`.cache/db-updates/`, and neither is removed automatically, so clean them up from time to
+time (`.cache/db-updates/current.json` names the download in use). The compose MySQL
+publishes no port on the host; connect from inside its container:
+
+```bash
+docker compose exec mysql sh -c 'mysql -uuser -p"$MYSQL_PASSWORD" bolt_db'
 ```
 
-- **No new DB:** one digest lookup, then the scan. Nothing is downloaded or loaded.
-- **New DB:** that scan replaces the whole database before scanning. Updates replace all
-  tables; they are not incremental.
-- **Update fails:** the existing data stays, and the scan fails rather than silently
-  scanning with an outdated database.
-- Without any MySQL connection (outside compose, with neither `--mysql-dsn` nor
-  `TRIVY_MYSQL_DSN`), BOLT falls back to Trivy's behavior and keeps the DB file in `.cache`.
+Without a MySQL connection (outside compose, with neither `--mysql-dsn` nor
+`TRIVY_MYSQL_DSN`), BOLT falls back to Trivy's own handling and keeps the database file in
+`.cache`.
 
 ### Updating ahead of time or skipping updates
 
@@ -405,48 +387,6 @@ docker compose run --rm bolt image locally-available-image:tag \
 - `--skip-db-update` cannot be combined with `--download-db-only`.
 - To avoid the Java DB download and external dependency lookups as well, add
   `--skip-java-db-update --offline-scan`.
-
-### Using a separate MySQL server
-
-By default the `mysql` container started by `docker compose` is used. To use an existing
-MySQL server instead, point `--mysql-dsn` at it.
-
-1. **Do not store other data in this database.** Each update replaces all four tables with
-   the official DB, so data added by hand is lost.
-2. **To update the DB only**, add `--no-deps` so that the compose `mysql` container is not
-   started:
-
-   ```bash
-   docker compose run --rm --no-deps bolt image \
-     --download-db-only --timeout 30m \
-     --mysql-dsn 'bolt:...@tcp(db.example:3306)/bolt_db' \
-     --db-repository ghcr.io/aquasecurity/trivy-db:2
-   ```
-
-One way to run this: update periodically with a writable account, and scan with a
-read-only account and `--skip-db-update`. Scans then do not wait for updates, and you
-decide when updates happen.
-
-### Disk usage
-
-Since trivy-db is republished about every 6 hours, the first scan or `update-db.sh` after
-that reloads the whole database. Each reload leaves the following behind, and **nothing
-removes them automatically**:
-
-| Location | Contents | How to clean up |
-|---|---|---|
-| MySQL `*_backup_*` tables | The previous DB, for recovery | `DROP TABLE` once the new DB is confirmed, following your retention needs |
-| `.cache/db-updates/<digest>/` | Downloaded trivy-db files | Delete directories that `current.json` does not point to |
-
-During an update the existing data, the new staging tables and the backups exist at the
-same time, so leave room for all three.
-
-The compose MySQL does not publish a port on the host. To connect to it, for example to
-drop backup tables, connect from inside its container:
-
-```bash
-docker compose exec mysql sh -c 'mysql -uuser -p"$MYSQL_PASSWORD" bolt_db'
-```
 
 ## Cleanup
 

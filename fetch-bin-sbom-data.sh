@@ -11,20 +11,14 @@
 # docker-compose.yml mounts this checkout at /work and points BIN_SBOM_DB and
 # BIN_SBOM_GHIDRA at those paths.
 #
-# Ghidra is fetched from its public release. No component database is distributed:
-# build one from the OSS sources you choose (see "Build the component database" in
-# README.md). A team that already built one can share it as a bundle made with
-# ./pack-bin-sbom-data.sh and install it here with BIN_SBOM_DATA_URL=<url>.
+# Ghidra is fetched from its public release. No component database is distributed or
+# downloaded: build one from the OSS sources you choose (see "Build the component
+# database" in README.md). This script only reports whether one is present.
 
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BSG_DIR="$ROOT_DIR/Binary_SBOM_Generator"
-
-# Optional: a bundle produced by ./pack-bin-sbom-data.sh, holding database/ and
-# osscollector/repo_meta/. Its integrity is the provider's responsibility; nothing here
-# can verify it.
-DATA_URL="${BIN_SBOM_DATA_URL:-}"
 
 GHIDRA_VERSION="11.2.1"
 GHIDRA_DIRNAME="ghidra_${GHIDRA_VERSION}_PUBLIC"
@@ -127,16 +121,15 @@ fetch_ghidra() {
     echo "[+] Ghidra installed at 'Binary_SBOM_Generator/tools/ghidra/$GHIDRA_DIRNAME'."
 }
 
-fetch_component_db() {
+check_component_db() {
     if component_db_present; then
         echo "[*] bin-sbom component database already present."
         return
     fi
 
-    if [ -z "$DATA_URL" ]; then
-        # Not an error: the rest of the setup does not need the database, and scans
-        # that use bin-sbom stop with the same guidance until it exists.
-        cat >&2 <<EOT
+    # Not an error: the rest of the setup does not need the database, and scans that
+    # use bin-sbom stop with the same guidance until it exists.
+    cat >&2 <<EOT
 [!] Warning: no bin-sbom component database is installed.
 
     BOLT does not distribute one. Scans with the default generator (bom-blint) work
@@ -145,52 +138,6 @@ fetch_component_db() {
     Binary_SBOM_Generator/osscollector/repolist.txt
     (see "Build the component database" in README.md).
 EOT
-        return
-    fi
-
-    require_cmd wget tar
-
-    echo "[!] Installing the component database from BIN_SBOM_DATA_URL without a checksum check."
-    echo "[*] Downloading bin-sbom component database from '$DATA_URL'..."
-    # Staged in a sibling directory and renamed into place: extracting straight into
-    # Binary_SBOM_Generator would leave a half-populated database/ behind on an
-    # interrupted download, and the next run would treat it as a finished install.
-    local stage_dir
-    stage_dir="$(mktemp -d "$BSG_DIR/.bin-sbom-data.XXXXXX")"
-    STAGING_DIRS+=("$stage_dir")
-
-    if ! wget -O "$stage_dir/bin-sbom-data.tar.gz" "$DATA_URL"; then
-        echo "[-] Error: could not download the bundle from '$DATA_URL'." >&2
-        exit 1
-    fi
-
-    echo "[*] Extracting component database..."
-    if ! tar xzf "$stage_dir/bin-sbom-data.tar.gz" -C "$stage_dir"; then
-        echo "[-] Error: the download is not a gzip archive." >&2
-        echo "    File-sharing links often serve an HTML preview page instead of the" >&2
-        echo "    file; use a direct-download link." >&2
-        exit 1
-    fi
-
-    if [ ! -d "$stage_dir/database" ] || [ ! -d "$stage_dir/osscollector/repo_meta" ]; then
-        echo "[-] Error: bundle is missing 'database/' or 'osscollector/repo_meta/'." >&2
-        echo "    Rebuild it with ./pack-bin-sbom-data.sh." >&2
-        exit 1
-    fi
-
-    rm -rf "$BSG_DIR/database"
-    mv "$stage_dir/database" "$BSG_DIR/database"
-
-    mkdir -p "$BSG_DIR/osscollector"
-    rm -rf "$BSG_DIR/osscollector/repo_meta"
-    mv "$stage_dir/osscollector/repo_meta" "$BSG_DIR/osscollector/repo_meta"
-
-    if ! component_db_present; then
-        echo "[-] Error: component database still incomplete after extraction." >&2
-        exit 1
-    fi
-
-    echo "[+] Component database installed at 'Binary_SBOM_Generator/database'."
 }
 
 if [ ! -d "$BSG_DIR" ]; then
@@ -202,7 +149,7 @@ fi
 mkdir -p "$BSG_DIR/tools"
 
 fetch_ghidra
-fetch_component_db
+check_component_db
 
 if component_db_present; then
     echo "[*] bin-sbom run-time data is ready."
