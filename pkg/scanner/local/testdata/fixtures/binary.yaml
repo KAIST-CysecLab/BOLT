@@ -1,0 +1,66 @@
+# Synthetic advisories for the binary scanner integration tests, not real CVEs.
+- bucket: "conan::GitLab Advisory Database Community"
+  pairs:
+    - bucket: zlib
+      pairs:
+        - key: CVE-2099-0001
+          value:
+            VulnerableVersions: ["<1.2.13"]
+            PatchedVersions: ["1.2.13"]
+        - key: CVE-2099-0002
+          value:
+            VulnerableVersions: ["<1.2.8"]
+            PatchedVersions: ["1.2.8"]
+- bucket: "npm::GitHub Security Advisory npm"
+  pairs:
+    - bucket: fixture-widget
+      pairs:
+        - key: CVE-2099-0003
+          value:
+            VulnerableVersions: ["<1.1.0"]
+            PatchedVersions: ["1.1.0"]
+- bucket: "pip::GitHub Security Advisory pip"
+  pairs:
+    - bucket: fixture-widget
+      pairs:
+        - key: CVE-2099-0004
+          value:
+            VulnerableVersions: ["<1.1.0"]
+            PatchedVersions: ["1.1.0"]
+- bucket: data-source
+  pairs:
+    - key: "conan::GitLab Advisory Database Community"
+      value:
+        ID: glad
+        Name: GitLab Advisory Database Community
+        URL: https://gitlab.com/gitlab-org/advisories-community
+    - key: "npm::GitHub Security Advisory npm"
+      value:
+        ID: ghsa
+        Name: GitHub Security Advisory npm
+        URL: https://github.com/advisories
+    - key: "pip::GitHub Security Advisory pip"
+      value:
+        ID: ghsa
+        Name: GitHub Security Advisory pip
+        URL: https://github.com/advisories
+- bucket: vulnerability
+  pairs:
+    - key: CVE-2099-0001
+      value:
+        Title: Synthetic zlib integration advisory
+        Description: Affected before the synthetic fixed release.
+        Severity: HIGH
+    - key: CVE-2099-0002
+      value:
+        Title: Synthetic older zlib integration advisory
+        Description: Tests enumeration despite a newer reference version.
+        Severity: MEDIUM
+    - key: CVE-2099-0003
+      value:
+        Title: Synthetic npm integration advisory
+        Severity: HIGH
+    - key: CVE-2099-0004
+      value:
+        Title: Synthetic PyPI integration advisory
+        Severity: HIGH

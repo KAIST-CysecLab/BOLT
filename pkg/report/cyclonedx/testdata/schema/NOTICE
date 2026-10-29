@@ -1,0 +1,16 @@
+CycloneDX specification schemas
+Copyright OWASP Foundation
+
+These unchanged schema fixtures were downloaded from the official CycloneDX
+specification repository, tag 1.6, during the 2026-10-19 validation.
+The per-file source URLs and SHA-256 hashes are recorded in manifest.json.
+https://github.com/CycloneDX/specification/tree/1.6/schema
+https://github.com/CycloneDX/specification/blob/1.6/LICENSE
+
+Distributed under Apache License 2.0; a copy is included in LICENSE.
+The JSF schema retains its original attribution to Anders Rundgren and the
+OpenKeyStore project in its $comment field.
+
+Schema tests register every reference locally and reject any undeclared
+reference instead of downloading it. The writer output is validated directly
+as JSON bytes, without round-tripping through a CycloneDX struct.

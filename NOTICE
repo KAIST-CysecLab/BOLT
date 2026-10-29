@@ -1,0 +1,36 @@
+BOLT
+Copyright 2025-2026 Korea Advanced Institute of Science and Technology (KAIST)
+for the modifications and additions made to Trivy for BOLT. Other parts are
+copyrighted by their respective authors, as listed below.
+
+This product is a modified version of Trivy (https://github.com/aquasecurity/trivy),
+developed by Aqua Security, forked from upstream commit b675b06e8 (after v0.59.0)
+and distributed under the terms of the Apache License, Version 2.0.
+
+Source files modified for BOLT carry a "Modified by" notice at the top of the file,
+as required by Section 4(b) of the License. In addition, README.md was rewritten
+for BOLT, and go.mod and go.sum were changed to add and update dependencies; this
+notice covers those three files.
+
+This product bundles the following third-party components:
+
+  bom_blint (bom_blint-2.4.2-py3-none-any.whl)
+    A modified version of BLint (https://github.com/owasp-dep-scan/blint),
+    Copyright (c) OWASP Foundation, distributed under the MIT License.
+    Its license text is included in the wheel.
+
+  Binary_SBOM_Generator (Binary_SBOM_Generator/)
+    Copyright (c) 2026 Software Security and Privacy Laboratory, Korea University,
+    distributed under the MIT License, with modifications for BOLT.
+    See Binary_SBOM_Generator/LICENSE.
+
+  CycloneDX specification schemas (pkg/report/cyclonedx/testdata/schema/)
+    Copyright OWASP Foundation, distributed under the Apache License 2.0.
+    See the NOTICE and LICENSE files in that directory.
+
+--------------------------------------------------------------------------------
+
+Trivy
+Copyright 2019-2020 Aqua Security Software Ltd.
+
+This product includes software developed by Aqua Security (https://aquasec.com).

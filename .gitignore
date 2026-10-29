@@ -1,0 +1,10 @@
+# Modified by slyfizz on 2026-03-19: ignored local runtime and result artifacts
+# Modified by slyfizz on 2026-04-09: ignored the shared scanner cache
+bolt
+*.sql
+build/*
+.env 
+*/results/*
+*.tar
+
+.cache/

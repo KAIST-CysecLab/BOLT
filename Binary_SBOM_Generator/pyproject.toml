@@ -1,0 +1,46 @@
+[project]
+name = "bin-sbom"
+version = "0.1.0"
+description = "Binary software composition analysis: detect OSS components in binaries and emit a CycloneDX SBOM"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "tree-sitter>=0.21.3",
+    "tree-sitter-c>=0.21.4",
+    "tree-sitter-cpp>=0.22.3",
+    "py-tlsh==4.7.2",
+    "numpy>=1.24.0",
+    "gitdb==4.0.12",
+    "gitpython==3.1.45",
+    "smmap==5.0.2",
+    "faiss-cpu>=1.7.0",
+]
+
+[project.scripts]
+bin-sbom = "bin_sbom.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# uv installs the root project in editable mode, which hatchling cannot do while the
+# `sources` mapping below rewrites the src/ prefix instead of removing it. Nothing in
+# the checkout needs the project installed -- the pipeline is run by path
+# (`uv run python src/detector.py`) -- so uv only provides the dependencies, exactly
+# as it did before this project gained a build backend.
+# The bin-sbom command comes from a real install: `pip install .` (see build.sh and
+# Dockerfile.bolt), which builds a normal wheel and is unaffected.
+[tool.uv]
+package = false
+
+# The pipeline scripts live in src/ and are run directly from a checkout
+# (`uv run python src/detector.py`). Rather than move them, the wheel remaps
+# src/ onto the bin_sbom package so both entry paths keep working.
+[tool.hatch.build.targets.wheel]
+only-include = ["src"]
+
+[tool.hatch.build.targets.wheel.sources]
+"src" = "bin_sbom"
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "tools", "osscollector/repolist.txt", "README.md", "LICENSE"]

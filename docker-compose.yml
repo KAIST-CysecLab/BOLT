@@ -1,0 +1,58 @@
+services:
+  mysql:
+    image: mysql:8.4
+    command: ["mysqld", "--innodb-redo-log-capacity=1073741824"]
+    # The passwords are generated into .env by init.sh. MySQL applies them only when
+    # it first initializes the mysql_data volume.
+    environment:
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:?run ./init.sh to generate .env}"
+      MYSQL_DATABASE: bolt_db
+      MYSQL_USER: user
+      MYSQL_PASSWORD: "${MYSQL_PASSWORD:?run ./init.sh to generate .env}"
+    # No published ports: bolt reaches mysql:3306 over the compose network, and
+    # publishing 3306 would expose the vulnerability database to the host's network.
+    volumes:
+      # update-db.sh refreshes this database from the official Trivy OCI artifact.
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      # mysqladmin ping exits 0 once the server answers, even when the login is
+      # refused, so no password is needed here.
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "--silent"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  bolt:
+    image: bolt:dev
+    build:
+      context: .
+      dockerfile: Dockerfile.bolt
+      args:
+        # bin-sbom is included unless INSTALL_BIN_SBOM=false. It pulls in
+        # numpy/faiss/tree-sitter and a JDK.
+        INSTALL_BIN_SBOM: "${INSTALL_BIN_SBOM:-true}"
+    user: "${UID:-1000}:${GID:-1000}"
+    working_dir: /work
+    environment:
+      # bin-sbom reads its prebuilt component database and Ghidra install from the
+      # repository, which is already mounted at /work. Override these if they live
+      # somewhere else and mount that location as well.
+      BIN_SBOM_DB: "${BIN_SBOM_DB:-/work/Binary_SBOM_Generator}"
+      BIN_SBOM_GHIDRA: "${BIN_SBOM_GHIDRA:-/work/Binary_SBOM_Generator/tools/ghidra/ghidra_11.2.1_PUBLIC}"
+      # The vulnerability database. bolt reads this when --mysql-dsn is not given, so
+      # scans need no credentials on the command line; an explicit --mysql-dsn wins.
+      TRIVY_MYSQL_DSN: "user:${MYSQL_PASSWORD:?run ./init.sh to generate .env}@tcp(mysql:3306)/bolt_db"
+    group_add:
+      # The Docker socket's group, recorded by init.sh. There is no fallback: a default
+      # of 0 would put the container user in the root group.
+      - "${SOCK_GID:?run ./init.sh to generate .env}"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - ./:/work
+      - ./.cache:/cache
+      - /var/run/docker.sock:/var/run/docker.sock
+
+volumes:
+  mysql_data:

@@ -1,0 +1,130 @@
+# syntax=docker/dockerfile:1.7
+
+############################
+# 1) Go builder (build bolt)
+############################
+FROM golang:1.23.5 AS bolt-builder
+WORKDIR /src
+
+# Cache-friendly module download
+COPY go.mod go.sum ./
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
+
+COPY . .
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/bolt ./cmd/trivy
+
+############################
+# 2) Runtime (Python + bom_blint + bolt)
+############################
+FROM python:3.12-slim AS runtime
+
+# Required utilities: some binary analysis needs binutils
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates file bash binutils default-mysql-client \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /work
+
+# Upgrade pip tooling
+RUN python -m pip install --upgrade pip wheel
+
+# Use only the local wheel (keep the wheel unmodified)
+COPY bom_blint-*.whl /opt/
+RUN python -m pip install --no-cache-dir /opt/bom_blint-*.whl
+
+# Safe launcher:
+#   - Some wheels may not generate console scripts, or may use a different name
+#   - Provide a tiny wrapper without modifying the wheel
+RUN printf '%s\n' '#!/usr/bin/env python3' \
+'from bom_blint.cli import main' \
+'if __name__ == "__main__": main()' > /usr/local/bin/bom-blint \
+ && chmod +x /usr/local/bin/bom-blint \
+ && ln -sf /usr/local/bin/bom-blint /usr/local/bin/bom_blint
+
+# bin-sbom (--binary-sbom bin-sbom) is installed unless built with
+# --build-arg INSTALL_BIN_SBOM=false. It pulls in numpy/faiss/
+# tree-sitter plus a JDK, and it cannot run without a Ghidra install and a prebuilt
+# component database mounted at scan time (BIN_SBOM_DB, BIN_SBOM_GHIDRA).
+ARG INSTALL_BIN_SBOM=true
+# Only the packaging inputs are copied. Copying the whole directory would bake a
+# locally built component database (gigabytes) into this layer.
+COPY Binary_SBOM_Generator/pyproject.toml Binary_SBOM_Generator/README.md \
+     Binary_SBOM_Generator/LICENSE /opt/bin-sbom-src/
+COPY Binary_SBOM_Generator/src /opt/bin-sbom-src/src
+# g++: py-tlsh publishes no wheel for this platform and compiles a C++ extension, so a
+# compiler is installed and removed within this layer rather than shipped.
+#
+# openjdk-21-jdk-headless: bin-sbom shells out to Ghidra's analyzeHeadless, which needs
+# a JDK on PATH. Ghidra 11.2.1 declares application.java.min=21, and its launcher
+# refuses a JRE, so neither default-jdk (17 on some releases) nor a JRE package will do.
+# Without this every bin-sbom run dies with "Java runtime not found" and the scan
+# silently produces no binary SBOM data at all.
+#
+# libharfbuzz0b / libfreetype6 / fontconfig: the -headless JDK ships libfontmanager.so
+# without the font stack it links against. Ghidra's GccExceptionAnalyzer reaches into AWT
+# during analysis, so the missing libharfbuzz.so.0 aborts every decompilation with
+# UnsatisfiedLinkError even though nothing is actually drawn.
+RUN if [ "$INSTALL_BIN_SBOM" = "true" ]; then \
+        apt-get update \
+     && apt-get install -y --no-install-recommends g++ openjdk-21-jdk-headless \
+        libharfbuzz0b libfreetype6 fontconfig \
+     && python -m pip install --no-cache-dir /opt/bin-sbom-src \
+     && apt-get purge -y --auto-remove g++ \
+     && rm -rf /var/lib/apt/lists/*; \
+    fi \
+ && rm -rf /opt/bin-sbom-src
+
+# Copy the bolt binary from the builder stage
+COPY --from=bolt-builder /out/bolt /usr/local/bin/bolt
+
+# Optional DB init wrapper (uses mysql client if enabled)
+COPY docker/bolt-entrypoint.sh /usr/local/bin/bolt-entrypoint
+
+# /home/app is world-writable for the same reason /cache and /work/reports are:
+# docker-compose runs this image as the host user's UID, not as the "app" account baked
+# in here, so anything owned by app:app is read-only at run time. Ghidra needs a writable
+# HOME -- its launcher saves the JDK it discovers under $HOME/.config/ghidra, and when
+# that write fails it reports "Unable to prompt user for JDK path, no TTY detected" and
+# every bin-sbom decompilation fails.
+RUN chmod +x /usr/local/bin/bolt \
+ && chmod +x /usr/local/bin/bolt-entrypoint \
+ && useradd -m -u 10001 app \
+ && mkdir -p /cache /work/reports \
+ && chown -R app:app /cache /work \
+ && chmod 1777 /cache /work/reports /home/app
+
+USER app
+
+# Container defaults (avoid permission-related issues)
+ENV HOME=/home/app \
+    XDG_DATA_HOME=/cache \
+    BOLT_CACHE_DIR=/cache \
+    TRIVY_CACHE_DIR=/cache \
+    PATH="/usr/local/bin:${PATH}" \
+    NO_COLOR=1 \
+    FORCE_COLOR=0 \
+    TERM=dumb \
+    PYTHONUNBUFFERED=1 \
+    PYTHONIOENCODING=UTF-8 \
+    PYTHONUTF8=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONNOUSERSITE=1 \
+    RICH_TRACEBACK=0 \
+    LOGURU_LEVEL=ERROR \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8
+
+# Neither the component database nor Ghidra is baked into this image; both are far too
+# large and are mounted at scan time. These point into /work, which is where
+# docker-compose.yml bind-mounts the checkout that fetch-bin-sbom-data.sh populates, so
+# `docker run -v "$PWD:/work"` is enough and compose does not have to supply them.
+# They previously defaulted to /bin-sbom/data and /bin-sbom/ghidra, paths that exist in
+# no image or mount, so anything not going through compose failed on a path that was
+# never going to be there.
+ENV BIN_SBOM_DB=/work/Binary_SBOM_Generator \
+    BIN_SBOM_GHIDRA=/work/Binary_SBOM_Generator/tools/ghidra/ghidra_11.2.1_PUBLIC
+
+ENTRYPOINT ["/usr/local/bin/bolt-entrypoint"]

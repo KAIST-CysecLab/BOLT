@@ -1,0 +1,20 @@
+# Modified by KimSeoYe on 2026-08-06: excluded bin-sbom run-time data from the build context
+# Modified by KimSeoYe on 2026-08-07: excluded local SQL dumps from the build context
+# Modified by slyfizz on 2026-10-06: restated the SQL dump exclusion for the official DB updater
+.git
+.github
+.cache
+.circleci
+integration
+imgs
+
+# Legacy SQL dumps are not used by the official DB updater or any build stage.
+# Exclude them so the builder's `COPY . .` does not send large local backups.
+*.sql
+
+# bin-sbom data: built locally, mounted at run time, never part of the image
+Binary_SBOM_Generator/database
+Binary_SBOM_Generator/output
+Binary_SBOM_Generator/testset
+Binary_SBOM_Generator/tools/ghidra
+Binary_SBOM_Generator/osscollector/repo_meta

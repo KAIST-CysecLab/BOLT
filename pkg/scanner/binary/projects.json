@@ -1,0 +1,68 @@
+[
+  {
+    "component_ids": ["bzip2@@bzip2"],
+    "repositories": ["https://gitlab.com/bzip2/bzip2"],
+    "package": "bzip2",
+    "source": "https://github.com/conan-io/conan-center-index/blob/be753252dbdfb07d9094aaa9b4610a9f4c025ce7/recipes/bzip2/all/conandata.yml"
+  },
+  {
+    "component_ids": ["redis@@hiredis"],
+    "repositories": ["https://github.com/redis/hiredis"],
+    "package": "hiredis",
+    "source": "https://github.com/conan-io/conan-center-index/blob/be753252dbdfb07d9094aaa9b4610a9f4c025ce7/recipes/hiredis/all/conandata.yml"
+  },
+  {
+    "component_ids": ["jasper-software@@jasper"],
+    "repositories": ["https://github.com/jasper-software/jasper"],
+    "package": "jasper",
+    "source": "https://github.com/conan-io/conan-center-index/blob/be753252dbdfb07d9094aaa9b4610a9f4c025ce7/recipes/jasper/all/conandata.yml"
+  },
+  {
+    "component_ids": ["libjpeg-turbo@@libjpeg-turbo"],
+    "repositories": ["https://github.com/libjpeg-turbo/libjpeg-turbo"],
+    "package": "libjpeg-turbo",
+    "source": "https://github.com/conan-io/conan-center-index/blob/be753252dbdfb07d9094aaa9b4610a9f4c025ce7/recipes/libjpeg-turbo/all/conandata.yml"
+  },
+  {
+    "component_ids": ["pnggroup@@libpng"],
+    "repositories": ["https://github.com/pnggroup/libpng"],
+    "package": "libpng",
+    "source": "https://github.com/conan-io/conan-center-index/blob/be753252dbdfb07d9094aaa9b4610a9f4c025ce7/recipes/libpng/all/conandata.yml"
+  },
+  {
+    "component_ids": ["libtiff@@libtiff"],
+    "repositories": ["https://gitlab.com/libtiff/libtiff"],
+    "package": "libtiff",
+    "source": "https://github.com/conan-io/conan-center-index/blob/be753252dbdfb07d9094aaa9b4610a9f4c025ce7/recipes/libtiff/all/conandata.yml"
+  },
+  {
+    "component_ids": ["webm@@libwebp"],
+    "repositories": ["https://chromium.googlesource.com/webm/libwebp"],
+    "package": "libwebp",
+    "source": "https://github.com/conan-io/conan-center-index/blob/be753252dbdfb07d9094aaa9b4610a9f4c025ce7/recipes/libwebp/all/conandata.yml"
+  },
+  {
+    "component_ids": ["nlohmann@@json"],
+    "repositories": ["https://github.com/nlohmann/json"],
+    "package": "nlohmann_json",
+    "source": "https://github.com/conan-io/conan-center-index/blob/be753252dbdfb07d9094aaa9b4610a9f4c025ce7/recipes/nlohmann_json/all/conandata.yml"
+  },
+  {
+    "component_ids": ["kkos@@oniguruma"],
+    "repositories": ["https://github.com/kkos/oniguruma"],
+    "package": "oniguruma",
+    "source": "https://github.com/conan-io/conan-center-index/blob/be753252dbdfb07d9094aaa9b4610a9f4c025ce7/recipes/oniguruma/all/conandata.yml"
+  },
+  {
+    "component_ids": ["uclouvain@@openjpeg"],
+    "repositories": ["https://github.com/uclouvain/openjpeg"],
+    "package": "openjpeg",
+    "source": "https://github.com/conan-io/conan-center-index/blob/be753252dbdfb07d9094aaa9b4610a9f4c025ce7/recipes/openjpeg/all/conandata.yml"
+  },
+  {
+    "component_ids": ["madler@@zlib"],
+    "repositories": ["https://github.com/madler/zlib"],
+    "package": "zlib",
+    "source": "https://github.com/conan-io/conan-center-index/blob/be753252dbdfb07d9094aaa9b4610a9f4c025ce7/recipes/zlib/all/conandata.yml"
+  }
+]
